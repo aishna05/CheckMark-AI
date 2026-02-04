@@ -1,181 +1,463 @@
-# AI-Powered Freelancing Verification System - Design Document
+# Blockchain-Based AI Freelancing Platform - Design Document
 
 ## System Architecture
 
 ### High-Level Architecture
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Client Web    │    │ Freelancer Web  │    │   Admin Panel   │
+│   Client Web3   │    │ Freelancer Web3 │    │   Admin Panel   │
 │   Dashboard     │    │   Interface     │    │                 │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
          │                       │                       │
          └───────────────────────┼───────────────────────┘
                                  │
                     ┌─────────────────┐
-                    │   API Gateway   │
-                    │  (Load Balancer)│
+                    │   Web3 Gateway  │
+                    │ (Blockchain API)│
                     └─────────────────┘
                                  │
          ┌───────────────────────┼───────────────────────┐
          │                       │                       │
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   User Service  │    │ Project Service │    │Verification Core│
-│                 │    │                 │    │                 │
+│  Smart Contracts│    │   AI Services   │    │  IPFS Storage   │
+│   (Blockchain)  │    │   (Off-chain)   │    │ (Decentralized) │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
          │                       │                       │
          └───────────────────────┼───────────────────────┘
                                  │
                     ┌─────────────────┐
-                    │   Data Layer    │
-                    │  (Database +    │
-                    │  File Storage)  │
+                    │   Blockchain    │
+                    │   Network       │
+                    │ (Ethereum/Polygon)│
                     └─────────────────┘
 ```
 
 ## Core Components
 
-### 1. Project Management System
-**Purpose**: Handle project lifecycle from creation to completion
+### 1. Smart Contract System
+**Purpose**: Handle all blockchain operations and enforce platform rules
 
-**Components**:
-- **Project Creator**: Interface for clients to define requirements
-- **Requirement Parser**: NLP engine to structure and validate requirements
-- **Template Engine**: Pre-built templates for common project types
-- **Milestone Tracker**: Track project progress and deadlines
-
-**Data Models**:
-```json
-{
-  "project": {
-    "id": "string",
-    "clientId": "string",
-    "freelancerId": "string",
-    "title": "string",
-    "description": "string",
-    "requirements": {
-      "functional": ["array of features"],
-      "technical": ["array of tech specs"],
-      "quality": ["array of quality criteria"],
-      "deliverables": ["array of expected outputs"]
-    },
-    "status": "enum: draft|active|submitted|verified|completed|disputed",
-    "createdAt": "timestamp",
-    "deadline": "timestamp"
-  }
+#### 1.1 Project Management Contract
+```solidity
+contract ProjectManager {
+    struct Project {
+        address client;
+        address freelancer;
+        uint256 budget;
+        string requirementsHash; // IPFS hash
+        ProjectStatus status;
+        uint256 escrowAmount;
+        uint256 createdAt;
+        uint256 deadline;
+    }
+    
+    enum ProjectStatus {
+        PENDING_VALIDATION,
+        AVAILABLE,
+        ASSIGNED,
+        IN_PROGRESS,
+        SUBMITTED,
+        VERIFIED,
+        DISPUTED,
+        COMPLETED,
+        CANCELLED
+    }
+    
+    function createProject(uint256 _budget, string _requirementsHash) external payable;
+    function assignProject(uint256 _projectId) external;
+    function submitWork(uint256 _projectId, string _deliverableHash) external;
+    function verifyCompletion(uint256 _projectId, bool _approved) external;
+    function disputeVerification(uint256 _projectId, string _evidenceHash) external;
 }
 ```
 
-### 2. Secure Submission Environment
-**Purpose**: Provide isolated workspace for freelancer submissions
+#### 1.2 AI Oracle Contract
+```solidity
+contract AIOracle {
+    struct ValidationResult {
+        bool budgetFeasible;
+        uint8 feasibilityScore; // 0-100
+        string reasonHash; // IPFS hash of detailed explanation
+        uint256 timestamp;
+    }
+    
+    struct VerificationResult {
+        bool requirementsMet;
+        uint8 completionScore; // 0-100
+        string reportHash; // IPFS hash of detailed report
+        uint256 timestamp;
+    }
+    
+    function validateBudget(uint256 _projectId) external returns (bytes32 requestId);
+    function verifyDeliverable(uint256 _projectId) external returns (bytes32 requestId);
+    function submitValidationResult(bytes32 _requestId, ValidationResult _result) external;
+    function submitVerificationResult(bytes32 _requestId, VerificationResult _result) external;
+}
+```
 
+#### 1.3 Escrow Contract
+```solidity
+contract EscrowManager {
+    function depositFunds(uint256 _projectId) external payable;
+    function releaseFunds(uint256 _projectId) external;
+    function refundClient(uint256 _projectId) external;
+    function handleDispute(uint256 _projectId, uint8 _clientShare, uint8 _freelancerShare) external;
+}
+```
+
+### 2. AI Validation Services (Off-Chain)
+
+#### 2.1 Budget-Requirement Validation Engine
 **Components**:
-- **Submission Portal**: Secure upload interface for freelancers
-- **Isolation Engine**: Create sandboxed environments for each submission
-- **Version Control**: Git-based versioning for submitted work
-- **Asset Manager**: Handle different file types and dependencies
+- **Requirement Parser**: NLP engine to extract project specifications
+- **Market Rate Analyzer**: Real-time analysis of similar project costs
+- **Complexity Calculator**: Assess project difficulty and time requirements
+- **Budget Feasibility Scorer**: Generate 0-100 feasibility scores
+- **Recommendation Generator**: Suggest optimal budget ranges
 
-**Security Features**:
-- Container-based isolation
-- Encrypted file storage
-- Access logging and monitoring
-- Automatic malware scanning
+**Validation Process**:
+```javascript
+class BudgetValidator {
+    async validateProject(projectData) {
+        const requirements = await this.parseRequirements(projectData.description);
+        const marketRates = await this.getMarketRates(requirements);
+        const complexity = await this.assessComplexity(requirements);
+        const feasibilityScore = this.calculateFeasibility(
+            projectData.budget, 
+            marketRates, 
+            complexity
+        );
+        
+        return {
+            feasible: feasibilityScore >= 70,
+            score: feasibilityScore,
+            reasoning: this.generateReasoning(requirements, marketRates, complexity),
+            recommendations: this.generateRecommendations(requirements, marketRates)
+        };
+    }
+}
+```
 
-### 3. AI Verification Engine
-**Purpose**: Core intelligence for automated project verification
-
-#### 3.1 Code Analysis Module
+#### 2.2 Deliverable Verification Engine
 **Components**:
-- **Static Code Analyzer**: Parse and analyze code structure
-- **Feature Detector**: Identify implemented features using pattern matching
-- **Quality Assessor**: Evaluate code quality metrics
-- **Security Scanner**: Detect vulnerabilities and security issues
-
-**Supported Languages**: JavaScript, Python, Java, C#, PHP, Go, Ruby, TypeScript
-
-#### 3.2 Functional Validation Module
-**Components**:
-- **Test Runner**: Execute automated tests in isolated environments
-- **Workflow Simulator**: Simulate user interactions and workflows
-- **API Tester**: Validate API endpoints and responses
-- **UI Validator**: Check responsive design and accessibility
-
-#### 3.3 Requirement Matching Engine
-**Components**:
-- **NLP Processor**: Parse requirements into structured format
-- **Feature Mapper**: Map requirements to code implementations
+- **Code Analyzer**: Static analysis of submitted code
+- **Feature Detector**: Identify implemented features vs requirements
+- **Quality Assessor**: Evaluate code quality and best practices
+- **Functional Tester**: Automated testing of core functionalities
 - **Completeness Checker**: Verify all requirements are addressed
-- **Gap Analyzer**: Identify missing or incomplete features
 
-### 4. Evaluation & Reporting System
-**Purpose**: Generate comprehensive evaluation reports
-
-**Components**:
-- **Report Generator**: Create detailed evaluation reports
-- **Scoring Engine**: Calculate objective scores based on criteria
-- **Visualization Engine**: Generate charts and visual summaries
-- **Feedback Synthesizer**: Convert technical findings into actionable feedback
-
-**Report Structure**:
-```json
-{
-  "evaluation": {
-    "projectId": "string",
-    "overallScore": "number (0-100)",
-    "categories": {
-      "functionality": {
-        "score": "number",
-        "details": ["array of findings"],
-        "satisfied": ["array of met requirements"],
-        "missing": ["array of unmet requirements"]
-      },
-      "quality": {
-        "score": "number",
-        "codeQuality": "number",
-        "security": "number",
-        "performance": "number"
-      },
-      "completeness": {
-        "score": "number",
-        "deliverables": ["status of each deliverable"]
-      }
-    },
-    "recommendations": ["array of improvement suggestions"],
-    "decision": "enum: accept|revise|reject",
-    "generatedAt": "timestamp"
-  }
+**Verification Process**:
+```javascript
+class DeliverableVerifier {
+    async verifySubmission(projectId, deliverableHash) {
+        const deliverable = await this.fetchFromIPFS(deliverableHash);
+        const requirements = await this.getProjectRequirements(projectId);
+        
+        const codeAnalysis = await this.analyzeCode(deliverable);
+        const featureCheck = await this.checkFeatures(deliverable, requirements);
+        const qualityScore = await this.assessQuality(deliverable);
+        const functionalTest = await this.runTests(deliverable);
+        
+        const completionScore = this.calculateCompletionScore({
+            codeAnalysis,
+            featureCheck,
+            qualityScore,
+            functionalTest
+        });
+        
+        return {
+            requirementsMet: completionScore >= 80,
+            score: completionScore,
+            detailedReport: this.generateReport({
+                codeAnalysis,
+                featureCheck,
+                qualityScore,
+                functionalTest
+            })
+        };
+    }
 }
 ```
+
+### 3. Workflow Implementation
+
+#### 3.1 Project Creation & Validation Flow
+```
+1. Client creates project with requirements and budget
+   ↓
+2. Smart contract locks funds in escrow
+   ↓
+3. AI validates budget against requirements
+   ↓
+4. If feasible: Project becomes available to freelancers
+   If not feasible: Freelancer sees detailed explanation
+   ↓
+5. Freelancer can accept (with risk acknowledgment) or reject
+   ↓
+6. Upon acceptance: Project status changes to ASSIGNED
+```
+
+#### 3.2 Work Submission & Verification Flow
+```
+1. Freelancer completes work and submits to IPFS
+   ↓
+2. Smart contract triggers AI verification
+   ↓
+3. AI analyzes deliverable against requirements
+   ↓
+4. If verified: Client notified of successful completion
+   If issues found: Client receives detailed report
+   ↓
+5. Client can accept AI decision or dispute with evidence
+   ↓
+6. If disputed: AI re-evaluates with new evidence
+   ↓
+7. Final decision triggers automatic payment release
+```
+
+### 4. Evidence-Based Dispute Resolution System
+**Purpose**: Handle client disputes with proof-based validation
+
+**Components**:
+- **Evidence Submission Portal**: Interface for clients to upload proof of issues
+- **Evidence Analyzer**: AI system to evaluate submitted evidence
+- **Cross-Reference Engine**: Compare evidence against original deliverables
+- **Re-evaluation Trigger**: Automatic re-assessment when valid evidence is provided
+- **Communication Bridge**: Facilitate evidence-based discussions between parties
+
+**Evidence Types Supported**:
+- Screenshots of non-working features
+- Error logs and console outputs
+- Video recordings of functionality issues
+- Test results and performance metrics
+- Documentation gaps or inconsistencies
 
 ## User Experience Design
 
-### Client Dashboard
+### 1. Client Dashboard
 **Key Features**:
-- Project creation wizard with requirement templates
-- Real-time verification progress tracking
-- Detailed evaluation reports with visual summaries
-- Communication interface with freelancers
-- Payment release controls tied to verification status
+- Project creation with budget and requirements input
+- AI budget validation results with detailed explanations
+- Real-time project status tracking
+- Evidence submission interface for disputes
+- Proof-based communication with freelancers
 
-### Freelancer Interface
+**Project Creation Workflow**:
+```
+1. Client enters project requirements and proposed budget
+2. AI analyzes budget feasibility in real-time
+3. If feasible: Project posted to freelancer marketplace
+4. If not feasible: Detailed explanation with budget recommendations
+5. Client can adjust budget or proceed with current amount
+```
+
+### 2. Freelancer Interface
 **Key Features**:
-- Project details and requirement breakdown
-- Secure submission portal with drag-and-drop upload
-- Real-time verification status updates
-- Detailed feedback with specific improvement areas
-- Revision submission workflow
+- AI budget validation alerts with detailed reasoning
+- Project acceptance with risk acknowledgment option
+- Work submission portal with requirement checklist
+- Real-time AI verification feedback
+- Evidence-based revision requests from clients
 
-### Verification Process Flow
+**Project Acceptance Workflow**:
 ```
-1. Client creates project → Requirements stored as ground truth
-2. Freelancer accepts project → Work begins
-3. Freelancer submits work → Secure isolation
-4. AI verification starts → Automated analysis
-5. Evaluation report generated → Detailed findings
-6. Decision made → Accept/Revise/Reject
-7. If accepted → Code released to client
-8. If revision needed → Specific feedback provided
-9. Payment released → Based on verification success
+1. Freelancer views project with AI budget analysis
+2. If budget flagged: Detailed explanation of potential issues shown
+3. Freelancer options:
+   - Reject project with reason
+   - Accept with full risk acknowledgment
+   - Request budget clarification from client
+4. Upon acceptance: Project moves to active status
 ```
+
+### 3. AI Validation Workflows
+
+#### 3.1 Budget-Requirement Validation Flow
+```
+Client submits project → AI analyzes requirements complexity → 
+Market rate comparison → Feasibility scoring → 
+Decision: Pass to freelancers OR Flag with explanation → 
+Freelancer sees project with AI assessment → 
+Accept/Reject decision with full information
+```
+
+#### 3.2 Deliverable Verification Flow
+```
+Freelancer submits work → AI analyzes against requirements → 
+Feature completeness check → Quality assessment → 
+Decision: Requirements met OR Issues identified → 
+Client receives verification report → 
+Accept AI decision OR Submit evidence for dispute → 
+If disputed: AI re-evaluates with evidence
+```
+
+## Technical Implementation
+
+### 1. AI Service Architecture
+```javascript
+class AIValidationService {
+    // Budget validation
+    async validateBudget(requirements, proposedBudget) {
+        const complexity = await this.analyzeComplexity(requirements);
+        const marketRates = await this.getMarketData(requirements);
+        const timeEstimate = await this.estimateTimeRequired(requirements);
+        
+        const feasibilityScore = this.calculateFeasibility({
+            complexity,
+            marketRates,
+            timeEstimate,
+            proposedBudget
+        });
+        
+        return {
+            feasible: feasibilityScore >= 70,
+            score: feasibilityScore,
+            reasoning: this.generateExplanation(complexity, marketRates, proposedBudget),
+            recommendations: this.suggestBudgetRange(marketRates, complexity)
+        };
+    }
+    
+    // Deliverable verification
+    async verifyDeliverable(projectId, submittedWork) {
+        const requirements = await this.getProjectRequirements(projectId);
+        const analysis = await this.analyzeSubmission(submittedWork, requirements);
+        
+        return {
+            requirementsMet: analysis.completionScore >= 80,
+            completionScore: analysis.completionScore,
+            detailedReport: {
+                implementedFeatures: analysis.features.implemented,
+                missingFeatures: analysis.features.missing,
+                qualityIssues: analysis.quality.issues,
+                recommendations: analysis.recommendations
+            }
+        };
+    }
+    
+    // Evidence-based re-evaluation
+    async reEvaluateWithEvidence(projectId, evidence) {
+        const originalVerification = await this.getOriginalVerification(projectId);
+        const evidenceAnalysis = await this.analyzeEvidence(evidence);
+        
+        if (evidenceAnalysis.valid) {
+            return await this.verifyDeliverable(projectId, submittedWork, evidence);
+        }
+        
+        return originalVerification;
+    }
+}
+```
+
+### 2. Database Schema
+```sql
+-- Projects table
+CREATE TABLE projects (
+    id UUID PRIMARY KEY,
+    client_id UUID REFERENCES users(id),
+    freelancer_id UUID REFERENCES users(id),
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    requirements JSONB,
+    budget DECIMAL(10,2),
+    status VARCHAR(50),
+    ai_budget_validation JSONB,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- AI Validations table
+CREATE TABLE ai_validations (
+    id UUID PRIMARY KEY,
+    project_id UUID REFERENCES projects(id),
+    validation_type VARCHAR(50), -- 'budget' or 'deliverable'
+    result JSONB,
+    confidence_score INTEGER,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Evidence submissions table
+CREATE TABLE evidence_submissions (
+    id UUID PRIMARY KEY,
+    project_id UUID REFERENCES projects(id),
+    submitted_by UUID REFERENCES users(id),
+    evidence_type VARCHAR(50),
+    evidence_data JSONB,
+    ai_analysis JSONB,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Work submissions table
+CREATE TABLE work_submissions (
+    id UUID PRIMARY KEY,
+    project_id UUID REFERENCES projects(id),
+    freelancer_id UUID REFERENCES users(id),
+    submission_data JSONB,
+    ai_verification JSONB,
+    status VARCHAR(50),
+    submitted_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+### 3. API Endpoints
+```javascript
+// Project management
+POST /api/projects - Create project with AI budget validation
+GET /api/projects/{id} - Get project details with AI assessments
+PUT /api/projects/{id}/accept - Freelancer accepts project
+PUT /api/projects/{id}/reject - Freelancer rejects project
+
+// Work submission and verification
+POST /api/projects/{id}/submit - Submit work for AI verification
+GET /api/projects/{id}/verification - Get AI verification results
+POST /api/projects/{id}/evidence - Submit evidence for dispute
+PUT /api/projects/{id}/re-evaluate - Trigger AI re-evaluation
+
+// AI services
+POST /api/ai/validate-budget - Validate budget against requirements
+POST /api/ai/verify-deliverable - Verify submitted work
+POST /api/ai/analyze-evidence - Analyze dispute evidence
+```
+
+## Security & Privacy
+
+### Data Protection
+- Encrypted storage for all project data and submissions
+- Secure file upload and storage for evidence
+- Access control ensuring users only see their own projects
+- Audit logging for all AI decisions and user actions
+
+### AI Transparency
+- Detailed explanations for all AI decisions
+- Confidence scores for AI assessments
+- Version tracking for AI model updates
+- Human oversight for disputed cases
+
+## Scalability & Performance
+
+### System Optimization
+- Caching for frequently accessed AI models
+- Asynchronous processing for AI analysis
+- Load balancing for high-traffic periods
+- Database optimization for complex queries
+
+### AI Model Management
+- Continuous learning from user feedback
+- A/B testing for model improvements
+- Rollback capabilities for model updates
+- Performance monitoring and alerting
+
+## Future Enhancements
+
+### Phase 2 Features
+- Integration with popular development tools
+- Advanced evidence analysis (video, audio)
+- Multi-language support for global users
+- Mobile applications for iOS and Android
+
+### Phase 3 Features
+- Machine learning for personalized recommendations
+- Advanced dispute resolution with human arbitrators
+- Integration with payment gateways
+- Analytics dashboard for platform insights
 
 ## Technical Implementation
 
