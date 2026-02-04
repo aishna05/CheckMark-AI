@@ -1,111 +1,76 @@
-# Blockchain-Based AI Freelancing Platform - Design Document
+# AI-Powered Freelancing Platform - Design Document
 
 ## System Architecture
 
 ### High-Level Architecture
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Client Web3   │    │ Freelancer Web3 │    │   Admin Panel   │
+│   Client Web    │    │ Freelancer Web  │    │   Admin Panel   │
 │   Dashboard     │    │   Interface     │    │                 │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
          │                       │                       │
          └───────────────────────┼───────────────────────┘
                                  │
                     ┌─────────────────┐
-                    │   Web3 Gateway  │
-                    │ (Blockchain API)│
+                    │   API Gateway   │
+                    │ (Load Balancer) │
                     └─────────────────┘
                                  │
          ┌───────────────────────┼───────────────────────┐
          │                       │                       │
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│  Smart Contracts│    │   AI Services   │    │  IPFS Storage   │
-│   (Blockchain)  │    │   (Off-chain)   │    │ (Decentralized) │
+│  User Service   │    │   AI Services   │    │  File Storage   │
+│                 │    │                 │    │                 │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
          │                       │                       │
          └───────────────────────┼───────────────────────┘
                                  │
                     ┌─────────────────┐
-                    │   Blockchain    │
-                    │   Network       │
-                    │ (Ethereum/Polygon)│
+                    │   Database      │
+                    │   (PostgreSQL)  │
                     └─────────────────┘
 ```
 
 ## Core Components
 
-### 1. Smart Contract System
-**Purpose**: Handle all blockchain operations and enforce platform rules
+### 1. Project Management System
+**Purpose**: Handle project lifecycle from creation to completion
 
-#### 1.1 Project Management Contract
-```solidity
-contract ProjectManager {
-    struct Project {
-        address client;
-        address freelancer;
-        uint256 budget;
-        string requirementsHash; // IPFS hash
-        ProjectStatus status;
-        uint256 escrowAmount;
-        uint256 createdAt;
-        uint256 deadline;
-    }
-    
-    enum ProjectStatus {
-        PENDING_VALIDATION,
-        AVAILABLE,
-        ASSIGNED,
-        IN_PROGRESS,
-        SUBMITTED,
-        VERIFIED,
-        DISPUTED,
-        COMPLETED,
-        CANCELLED
-    }
-    
-    function createProject(uint256 _budget, string _requirementsHash) external payable;
-    function assignProject(uint256 _projectId) external;
-    function submitWork(uint256 _projectId, string _deliverableHash) external;
-    function verifyCompletion(uint256 _projectId, bool _approved) external;
-    function disputeVerification(uint256 _projectId, string _evidenceHash) external;
-}
+**Components**:
+- **Project Creator**: Interface for clients to define requirements and budget
+- **AI Budget Validator**: Real-time validation of budget against requirements
+- **Project Marketplace**: Display validated projects to freelancers
+- **Assignment Handler**: Manage project acceptance and rejection workflows
+- **Status Tracker**: Monitor project progress through all stages
+
+**Data Models**:
+```javascript
+const ProjectSchema = {
+    id: 'UUID',
+    clientId: 'UUID',
+    freelancerId: 'UUID',
+    title: 'String',
+    description: 'Text',
+    requirements: {
+        functional: ['Array of features'],
+        technical: ['Array of tech specs'],
+        quality: ['Array of quality criteria'],
+        deliverables: ['Array of expected outputs']
+    },
+    budget: 'Decimal',
+    status: 'Enum: draft|available|assigned|in_progress|submitted|verified|completed|disputed',
+    aiBudgetValidation: {
+        feasible: 'Boolean',
+        score: 'Integer',
+        reasoning: 'Text',
+        recommendations: 'Text'
+    },
+    createdAt: 'Timestamp',
+    deadline: 'Timestamp'
+};
 ```
 
-#### 1.2 AI Oracle Contract
-```solidity
-contract AIOracle {
-    struct ValidationResult {
-        bool budgetFeasible;
-        uint8 feasibilityScore; // 0-100
-        string reasonHash; // IPFS hash of detailed explanation
-        uint256 timestamp;
-    }
-    
-    struct VerificationResult {
-        bool requirementsMet;
-        uint8 completionScore; // 0-100
-        string reportHash; // IPFS hash of detailed report
-        uint256 timestamp;
-    }
-    
-    function validateBudget(uint256 _projectId) external returns (bytes32 requestId);
-    function verifyDeliverable(uint256 _projectId) external returns (bytes32 requestId);
-    function submitValidationResult(bytes32 _requestId, ValidationResult _result) external;
-    function submitVerificationResult(bytes32 _requestId, VerificationResult _result) external;
-}
-```
-
-#### 1.3 Escrow Contract
-```solidity
-contract EscrowManager {
-    function depositFunds(uint256 _projectId) external payable;
-    function releaseFunds(uint256 _projectId) external;
-    function refundClient(uint256 _projectId) external;
-    function handleDispute(uint256 _projectId, uint8 _clientShare, uint8 _freelancerShare) external;
-}
-```
-
-### 2. AI Validation Services (Off-Chain)
+### 2. AI Validation Services
 
 #### 2.1 Budget-Requirement Validation Engine
 **Components**:
@@ -149,14 +114,13 @@ class BudgetValidator {
 **Verification Process**:
 ```javascript
 class DeliverableVerifier {
-    async verifySubmission(projectId, deliverableHash) {
-        const deliverable = await this.fetchFromIPFS(deliverableHash);
+    async verifySubmission(projectId, deliverableFiles) {
         const requirements = await this.getProjectRequirements(projectId);
         
-        const codeAnalysis = await this.analyzeCode(deliverable);
-        const featureCheck = await this.checkFeatures(deliverable, requirements);
-        const qualityScore = await this.assessQuality(deliverable);
-        const functionalTest = await this.runTests(deliverable);
+        const codeAnalysis = await this.analyzeCode(deliverableFiles);
+        const featureCheck = await this.checkFeatures(deliverableFiles, requirements);
+        const qualityScore = await this.assessQuality(deliverableFiles);
+        const functionalTest = await this.runTests(deliverableFiles);
         
         const completionScore = this.calculateCompletionScore({
             codeAnalysis,
@@ -185,34 +149,30 @@ class DeliverableVerifier {
 ```
 1. Client creates project with requirements and budget
    ↓
-2. Smart contract locks funds in escrow
+2. AI validates budget against requirements in real-time
    ↓
-3. AI validates budget against requirements
-   ↓
-4. If feasible: Project becomes available to freelancers
+3. If feasible: Project becomes available to freelancers
    If not feasible: Freelancer sees detailed explanation
    ↓
-5. Freelancer can accept (with risk acknowledgment) or reject
+4. Freelancer can accept (with risk acknowledgment) or reject
    ↓
-6. Upon acceptance: Project status changes to ASSIGNED
+5. Upon acceptance: Project status changes to ASSIGNED
 ```
 
 #### 3.2 Work Submission & Verification Flow
 ```
-1. Freelancer completes work and submits to IPFS
+1. Freelancer completes work and submits files
    ↓
-2. Smart contract triggers AI verification
+2. AI analyzes deliverable against requirements
    ↓
-3. AI analyzes deliverable against requirements
-   ↓
-4. If verified: Client notified of successful completion
+3. If verified: Client notified of successful completion
    If issues found: Client receives detailed report
    ↓
-5. Client can accept AI decision or dispute with evidence
+4. Client can accept AI decision or dispute with evidence
    ↓
-6. If disputed: AI re-evaluates with new evidence
+5. If disputed: AI re-evaluates with new evidence
    ↓
-7. Final decision triggers automatic payment release
+6. Final decision triggers payment release process
 ```
 
 ### 4. Evidence-Based Dispute Resolution System
